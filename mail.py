@@ -205,26 +205,30 @@ class EmailMonitor:
             logger.info("🧪 Email accepté car mot-clé de test détecté")
             return True
 
-        # 1. Vérification des expéditeurs (priorité absolue)
+        # 1. PRIORITÉ : Vérification des mots-clés (peu importe l'expéditeur)
+        # Mots-clés dans le sujet
+        subject_keywords = self.config['filters'].get('subject_keywords', [])
+        logger.info(f"Vérification mots-clés sujet: {subject_keywords}")
+        for keyword in subject_keywords:
+            if keyword.lower() in subject.lower():
+                logger.info(f"✅ Email accepté car mot-clé '{keyword}' trouvé dans le sujet")
+                return True
+
+        # Mots-clés dans le contenu du corps
+        body_keywords = self.config['filters'].get('keywords', [])
+        logger.info(f"Vérification mots-clés corps: {body_keywords}")
+        for keyword in body_keywords:
+            # Recherche insensible à la casse et même si collé à d'autres lettres
+            if keyword.lower() in content.lower():
+                logger.info(f"✅ Email accepté car mot-clé '{keyword}' trouvé dans le contenu")
+                return True
+
+        # 2. Vérification des expéditeurs autorisés
         allowed_senders = self.config['filters'].get('senders', [])
+        logger.info(f"Vérification expéditeurs autorisés: {allowed_senders}")
         for allowed_sender in allowed_senders:
             if allowed_sender.lower() in sender.lower():
                 logger.info(f"✅ Email accepté car expéditeur autorisé: {sender}")
-                return True
-
-        # 2. Si l'expéditeur n'est pas autorisé, vérifier les mots-clés
-        # Mots-clés dans le sujet
-        subject_keywords = self.config['filters'].get('subject_keywords', [])
-        for keyword in subject_keywords:
-            if keyword.lower() in subject.lower():
-                logger.info(f"✅ Email accepté car mot-clé dans le sujet: '{keyword}'")
-                return True
-
-        # Mots-clés dans le contenu
-        body_keywords = self.config['filters'].get('keywords', [])
-        for keyword in body_keywords:
-            if keyword.lower() in content.lower():
-                logger.info(f"✅ Email accepté car mot-clé dans le contenu: '{keyword}'")
                 return True
 
         logger.info("❌ Email rejeté - aucun critère de filtre ne correspond")
@@ -234,7 +238,7 @@ class EmailMonitor:
         """Extrait le contenu textuel d'un email, en gérant le multipart et le HTML."""
         plain_text_content = ""
         html_content = ""
-
+        
         if msg.is_multipart():
             for part in msg.walk():
                 content_type = part.get_content_type()
