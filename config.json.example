@@ -1,0 +1,58 @@
+{
+    "email": {
+        "server": "partage.insa-lyon.fr",
+        "port": 993,
+        "username": "votre.email@insa-lyon.fr",
+        "password": "VOTRE_MOT_DE_PASSE_EMAIL",
+        "use_ssl": true
+    },
+    "filters": {
+        "senders": [
+            "bolig@sit.no",
+            //"youremail_for_testing@gmail.com"
+        ],
+        "keywords": [
+            "urgent",
+            "important",
+            "alerte"
+        ],
+        "subject_keywords": [
+            "URGENT",
+            "IMPORTANT",
+            "ALERTE"
+        ]
+    },
+    "notifications": {
+        
+        "ntfy": {
+            "enabled": false,
+            "url": "https://ntfy.sh/VOTRE_TOPIC_UNIQUE",
+            "priority": "urgent"
+        },
+        "twilio": {
+            "enabled": true,
+            "account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "auth_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "from_number": "+1234567890",
+            "to_number": "+33612345678"
+        },
+        "whatsapp_callmebot": {
+            "enabled": true,
+            "phone_number": "+33612345678",
+            "api_key": "VOTRE_CLE_API_CALLMEBOT"
+        },
+        "call_twilio": {
+            "enabled": true,
+            "account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "auth_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "from_number": "+1234567890",
+            "to_number": "+33612345678",
+            "message": "Vous avez reçu un email urgent."
+        },
+        
+    },
+    "monitoring": {
+        "check_interval": 15,
+        "mailbox": "INBOX"
+    }
+} 

@@ -1,0 +1,19 @@
+[Unit]
+Description=Email Monitor Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=emailmonitor
+Group=emailmonitor
+WorkingDirectory=/home/emailmonitor/email-monitor
+Environment=PATH=/home/emailmonitor/email-monitor/venv/bin
+ExecStart=/home/emailmonitor/email-monitor/venv/bin/python mail.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target 

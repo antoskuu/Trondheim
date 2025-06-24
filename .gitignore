@@ -1,0 +1,22 @@
+# Environnement virtuel
+venv/
+
+# Fichiers de configuration locaux (NE PAS COMMIT)
+config.json
+
+# Logs et bases de données
+*.log
+*.db
+*.sqlite3
+
+# Fichiers Python temporaires
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Fichiers de l'éditeur
+.idea/
+.vscode/
+*.swp
+*~
