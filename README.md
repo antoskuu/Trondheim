@@ -59,6 +59,72 @@ Idéal pour ne jamais manquer un email important, même lorsque vous n'êtes pas
     ```
     Le script commencera à surveiller votre boîte mail. Pour l'arrêter, faites `Ctrl+C`.
 
+## 🐳 Installation avec Docker (Recommandée)
+
+**Beaucoup plus simple !** Docker élimine tous les problèmes de dépendances et d'environnement.
+
+### Prérequis
+- Docker et Docker Compose
+
+### Installation rapide
+
+1.  **Clonez le dépôt :**
+    ```bash
+    git clone <URL_DU_REPO>
+    cd Email-Monitor
+    ```
+
+2.  **Lancez le script d'installation automatique :**
+    ```bash
+    chmod +x docker-install.sh
+    ./docker-install.sh
+    ```
+    
+    Ce script va :
+    - Installer Docker si nécessaire
+    - Créer `config.json` à partir de l'exemple
+    - Construire l'image Docker
+    - Lancer le conteneur en arrière-plan
+
+3.  **Configurez vos paramètres :**
+    ```bash
+    nano config.json
+    ```
+    *(Remplissez vos identifiants email, Twilio, CallMeBot, etc.)*
+
+4.  **Redémarrez le conteneur après configuration :**
+    ```bash
+    docker-compose restart
+    ```
+
+### Gestion du conteneur
+
+```bash
+# Voir les logs en temps réel
+docker-compose logs -f
+
+# Arrêter le service
+docker-compose stop
+
+# Redémarrer le service
+docker-compose restart
+
+# Voir le statut
+docker-compose ps
+
+# Arrêter et supprimer complètement
+docker-compose down
+```
+
+### Avantages Docker
+
+✅ **Installation en une commande**  
+✅ **Pas de problème de dépendances Python**  
+✅ **Isolation complète**  
+✅ **Redémarrage automatique**  
+✅ **Logs centralisés**  
+✅ **Portable sur n'importe quel serveur**  
+
 ## ⚙️ Configuration des Services de Notification
 
 Voici comment obtenir les clés d'API et configurer les services externes.

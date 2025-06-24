@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git/
+.gitignore
+*.log
+*.md
+deploy_digitalocean.sh
+email-monitor.service
+.vscode/
+.idea/
+*.swp
+*~ 

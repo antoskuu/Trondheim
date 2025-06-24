@@ -8,6 +8,7 @@ config.json
 *.log
 *.db
 *.sqlite3
+logs/
 
 # Fichiers Python temporaires
 __pycache__/
@@ -20,3 +21,6 @@ __pycache__/
 .vscode/
 *.swp
 *~
+
+# Docker
+get-docker.sh
