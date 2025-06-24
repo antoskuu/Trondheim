@@ -11,12 +11,19 @@ if ! command -v docker &> /dev/null; then
     echo "✅ Docker installé. Redémarrez votre session pour utiliser Docker sans sudo."
 fi
 
-# Vérifier que Docker Compose est installé
-if ! command -v docker-compose &> /dev/null; then
+# Détecter la commande docker-compose correcte
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
     echo "❌ Docker Compose n'est pas installé. Installation..."
     sudo apt-get update
     sudo apt-get install -y docker-compose-plugin
+    DOCKER_COMPOSE="docker compose"
 fi
+
+echo "📋 Utilisation de: $DOCKER_COMPOSE"
 
 # Créer le fichier config.json s'il n'existe pas
 if [ ! -f "config.json" ]; then
@@ -32,24 +39,24 @@ mkdir -p logs
 
 # Construire et lancer le conteneur
 echo "🏗️  Construction de l'image Docker..."
-docker-compose build
+$DOCKER_COMPOSE build
 
 echo "🚀 Lancement du conteneur..."
-docker-compose up -d
+$DOCKER_COMPOSE up -d
 
 echo ""
 echo "✅ Email Monitor est maintenant en cours d'exécution !"
 echo ""
 echo "📊 Commandes utiles :"
-echo "   docker-compose logs -f        # Voir les logs en temps réel"
-echo "   docker-compose stop           # Arrêter le service"
-echo "   docker-compose start          # Redémarrer le service"
-echo "   docker-compose restart        # Redémarrer le service"
-echo "   docker-compose down           # Arrêter et supprimer le conteneur"
-echo "   docker-compose ps             # Voir le statut du conteneur"
+echo "   $DOCKER_COMPOSE logs -f        # Voir les logs en temps réel"
+echo "   $DOCKER_COMPOSE stop           # Arrêter le service"
+echo "   $DOCKER_COMPOSE start          # Redémarrer le service"
+echo "   $DOCKER_COMPOSE restart        # Redémarrer le service"
+echo "   $DOCKER_COMPOSE down           # Arrêter et supprimer le conteneur"
+echo "   $DOCKER_COMPOSE ps             # Voir le statut du conteneur"
 echo ""
 echo "🔍 Vérification du statut :"
-docker-compose ps
+$DOCKER_COMPOSE ps
 echo ""
 echo "📝 Logs récents :"
-docker-compose logs --tail=20 
+$DOCKER_COMPOSE logs --tail=20 
