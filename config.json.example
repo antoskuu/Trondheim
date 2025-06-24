@@ -8,26 +8,57 @@
     },
     "filters": {
         "senders": [
-            "bolig@sit.no",
-            //"youremail_for_testing@gmail.com"
+            "expediteur1@example.com",
+            "expediteur2@example.com"
         ],
         "keywords": [
             "urgent",
             "important",
-            "alerte"
+            "alerte",
+            "stage",
+            "emploi",
+            "convocation",
+            "examen",
+            "deadline",
+            "échéance",
+            "candidature",
+            "entretien",
+            "réunion",
+            "logement",
+            "appartement",
+            "housing"
         ],
         "subject_keywords": [
             "URGENT",
             "IMPORTANT",
-            "ALERTE"
+            "ALERTE",
+            "CONVOCATION",
+            "RAPPEL",
+            "ACTION REQUISE",
+            "STAGE",
+            "JOB",
+            "EMPLOI",
+            "HOUSING",
+            "LOGEMENT"
         ]
     },
     "notifications": {
-        
+        "desktop": {
+            "enabled": true
+        },
+        "sound": {
+            "enabled": true,
+            "sound_file": "/usr/share/sounds/alsa/Front_Center.wav"
+        },
         "ntfy": {
-            "enabled": false,
+            "enabled": true,
             "url": "https://ntfy.sh/VOTRE_TOPIC_UNIQUE",
             "priority": "urgent"
+        },
+        "webhook": {
+            "enabled": false,
+            "url": "https://hooks.zapier.com/hooks/catch/...",
+            "method": "POST"
         },
         "twilio": {
             "enabled": true,
@@ -41,6 +72,24 @@
             "phone_number": "+33612345678",
             "api_key": "VOTRE_CLE_API_CALLMEBOT"
         },
+        "whatsapp_twilio": {
+            "enabled": false,
+            "account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "auth_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "from_number": "whatsapp:+14155238886",
+            "to_number": "whatsapp:+33612345678"
+        },
+        "call_callmebot": {
+            "enabled": false,
+            "phone_number": "+33612345678",
+            "api_key": "VOTRE_CLE_API_CALLMEBOT"
+        },
+        "alarm_intensive": {
+            "enabled": false,
+            "repeat_count": 3,
+            "interval_seconds": 2,
+            "sound_file": "/usr/share/sounds/alsa/Front_Center.wav"
+        },
         "call_twilio": {
             "enabled": true,
             "account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -49,7 +98,11 @@
             "to_number": "+33612345678",
             "message": "Vous avez reçu un email urgent."
         },
-        
+        "call_freemobile": {
+            "enabled": false,
+            "user": "VOTRE_IDENTIFIANT_FREE",
+            "pass": "VOTRE_CLE_API_FREE"
+        }
     },
     "monitoring": {
         "check_interval": 15,

@@ -193,46 +193,97 @@ class EmailMonitor:
         return decoded_text
     
     def check_email_filters(self, sender: str, subject: str, content: str) -> bool:
-        """Vérifie si l'email correspond aux filtres configurés"""
-        # Vérification des expéditeurs (priorité absolue)
-        for allowed_sender in self.config['filters']['senders']:
+        """Vérifie si l'email correspond aux filtres configurés."""
+        logger.info("=== FILTRAGE EMAIL ===")
+        logger.info(f"Expéditeur: {sender}")
+        logger.info(f"Sujet: {subject}")
+        content_preview = content.strip()
+        logger.info(f"Contenu (100 premiers caractères): {content_preview[:100]}...")
+
+        # TEST TEMPORAIRE - mot magique pour forcer la détection
+        if "TESTKEYWORDINC" in subject.upper() or "TESTKEYWORDINC" in content.upper():
+            logger.info("🧪 Email accepté car mot-clé de test détecté")
+            return True
+
+        # 1. Vérification des expéditeurs (priorité absolue)
+        allowed_senders = self.config['filters'].get('senders', [])
+        for allowed_sender in allowed_senders:
             if allowed_sender.lower() in sender.lower():
-                logger.info(f"Email accepté car expéditeur autorisé: {sender}")
+                logger.info(f"✅ Email accepté car expéditeur autorisé: {sender}")
                 return True
-        
-        # Vérification des mots-clés dans le sujet (seulement si expéditeur non autorisé)
-        for keyword in self.config['filters']['subject_keywords']:
+
+        # 2. Si l'expéditeur n'est pas autorisé, vérifier les mots-clés
+        # Mots-clés dans le sujet
+        subject_keywords = self.config['filters'].get('subject_keywords', [])
+        for keyword in subject_keywords:
             if keyword.lower() in subject.lower():
-                logger.info(f"Email accepté car mot-clé dans sujet: {keyword}")
+                logger.info(f"✅ Email accepté car mot-clé dans le sujet: '{keyword}'")
                 return True
-        
-        # Vérification des mots-clés dans le contenu (seulement si expéditeur non autorisé)
-        for keyword in self.config['filters']['keywords']:
+
+        # Mots-clés dans le contenu
+        body_keywords = self.config['filters'].get('keywords', [])
+        for keyword in body_keywords:
             if keyword.lower() in content.lower():
-                logger.info(f"Email accepté car mot-clé dans contenu: {keyword}")
+                logger.info(f"✅ Email accepté car mot-clé dans le contenu: '{keyword}'")
                 return True
-        
+
+        logger.info("❌ Email rejeté - aucun critère de filtre ne correspond")
         return False
     
     def get_email_content(self, msg) -> str:
-        """Extrait le contenu textuel d'un email"""
-        content = ""
-        
+        """Extrait le contenu textuel d'un email, en gérant le multipart et le HTML."""
+        plain_text_content = ""
+        html_content = ""
+
         if msg.is_multipart():
             for part in msg.walk():
                 content_type = part.get_content_type()
-                if content_type == "text/plain":
+                if content_type not in ["text/plain", "text/html"]:
+                    continue
+
+                try:
                     payload = part.get_payload(decode=True)
-                    if payload:
-                        charset = part.get_content_charset() or 'utf-8'
-                        content += payload.decode(charset, errors='ignore')
+                    if not payload:
+                        continue
+                    charset = part.get_content_charset() or 'utf-8'
+                    decoded_payload = payload.decode(charset, errors='ignore')
+
+                    if content_type == "text/plain":
+                        plain_text_content += decoded_payload
+                    elif content_type == "text/html":
+                        html_content += decoded_payload
+                except Exception as e:
+                    logger.warning(f"Impossible de décoder une partie de l'email: {e}")
+                    continue
         else:
-            payload = msg.get_payload(decode=True)
-            if payload:
-                charset = msg.get_content_charset() or 'utf-8'
-                content = payload.decode(charset, errors='ignore')
-        
-        return content
+            content_type = msg.get_content_type()
+            if content_type in ["text/plain", "text/html"]:
+                try:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        charset = msg.get_content_charset() or 'utf-8'
+                        decoded_payload = payload.decode(charset, errors='ignore')
+                        if content_type == "text/plain":
+                            plain_text_content = decoded_payload
+                        elif content_type == "text/html":
+                            html_content = decoded_payload
+                except Exception as e:
+                    logger.warning(f"Impossible de décoder le contenu de l'email: {e}")
+
+        if plain_text_content.strip():
+            return plain_text_content
+
+        if html_content:
+            # Suppression des styles et scripts
+            text_from_html = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+            text_from_html = re.sub(r'<script[^>]*>.*?</script>', '', text_from_html, flags=re.DOTALL | re.IGNORECASE)
+            # Suppression des autres balises HTML
+            text_from_html = re.sub(r'<[^>]*>', '', text_from_html)
+            # Nettoyage des lignes vides
+            text_from_html = '\n'.join([line.strip() for line in text_from_html.splitlines() if line.strip()])
+            return text_from_html
+
+        return ""
     
     def check_new_emails(self) -> List[Dict]:
         """Vérifie les nouveaux emails"""
