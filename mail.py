@@ -36,6 +36,7 @@ class EmailMonitor:
         self.last_email_uid = None
         self.running = False
         self.imap = None
+        self.last_error_notification_time = None
         
     def load_config(self, config_file: str) -> Dict:
         """Charge la configuration depuis un fichier JSON"""
@@ -147,65 +148,39 @@ class EmailMonitor:
         logger.info("Veuillez modifier ce fichier avec vos paramètres avant de relancer le programme")
     
     def connect_to_imap(self) -> bool:
-        """Se connecte au serveur IMAP Zimbra avec gestion d'erreurs améliorée"""
-        max_retries = 3
-        retry_delay = 30  # secondes
-        
-        for attempt in range(max_retries):
-            try:
-                # Fermer une connexion existante si elle existe
-                if self.imap:
-                    try:
-                        self.imap.close()
-                        self.imap.logout()
-                    except:
-                        pass
-                    self.imap = None
-                
-                logger.info(f"Tentative de connexion IMAP {attempt + 1}/{max_retries}")
-                
-                if self.config['email']['use_ssl']:
-                    self.imap = imaplib.IMAP4_SSL(
-                        self.config['email']['server'],
-                        self.config['email']['port']
-                    )
-                else:
-                    self.imap = imaplib.IMAP4(
-                        self.config['email']['server'],
-                        self.config['email']['port']
-                    )
-                
-                self.imap.login(
-                    self.config['email']['username'],
-                    self.config['email']['password']
+        """Se connecte au serveur IMAP Zimbra"""
+        try:
+            if self.config['email']['use_ssl']:
+                self.imap = imaplib.IMAP4_SSL(
+                    self.config['email']['server'],
+                    self.config['email']['port']
                 )
-                
-                self.imap.select(self.config['monitoring']['mailbox'])
-                logger.info("Connexion IMAP établie avec succès")
-                return True
-                
-            except Exception as e:
-                error_msg = str(e).lower()
-                logger.error(f"Erreur de connexion IMAP (tentative {attempt + 1}): {e}")
-                
-                # Vérifier si c'est un blocage temporaire
-                if any(keyword in error_msg for keyword in ['eof', 'protocol', 'connection', 'timeout']):
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Possible blocage temporaire détecté. Attente de {retry_delay}s avant nouvelle tentative...")
-                        time.sleep(retry_delay)
-                        continue
-                    else:
-                        logger.error("Échec après toutes les tentatives. Possible blocage du serveur.")
-                        logger.info("Suggestions:")
-                        logger.info("1. Attendez quelques minutes/heures avant de relancer")
-                        logger.info("2. Augmentez check_interval dans config.json")
-                        logger.info("3. Vérifiez que votre IP n'est pas bloquée")
-                        return False
-                else:
-                    # Erreur différente (credentials, etc.)
-                    return False
+            else:
+                self.imap = imaplib.IMAP4(
+                    self.config['email']['server'],
+                    self.config['email']['port']
+                )
             
-        return False
+            self.imap.login(
+                self.config['email']['username'],
+                self.config['email']['password']
+            )
+            
+            self.imap.select(self.config['monitoring']['mailbox'])
+            logger.info("Connexion IMAP établie avec succès")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Erreur de connexion IMAP: {e}")
+            error_message = str(e).lower()
+            
+            # Notifier pour les erreurs critiques de connexion
+            if any(err in error_message for err in ["eof occurred", "authentication failed", "connection refused"]):
+                title = "🚨 Erreur de Connexion Email"
+                body = f"Impossible de se connecter au serveur IMAP : {e}. Le service va retenter."
+                self.send_ntfy_error_notification(title, body)
+                
+            return False
     
     def decode_mime_words(self, text: str) -> str:
         """Décode les mots MIME encodés"""
@@ -233,12 +208,12 @@ class EmailMonitor:
         logger.info(f"Sujet: {subject}")
         content_preview = content.strip()
         logger.info(f"Contenu (100 premiers caractères): {content_preview[:100]}...")
-
+        
         # TEST TEMPORAIRE - mot magique pour forcer la détection
         if "TESTKEYWORDINC" in subject.upper() or "TESTKEYWORDINC" in content.upper():
             logger.info("🧪 Email accepté car mot-clé de test détecté")
             return True
-
+        
         # 1. PRIORITÉ : Vérification des mots-clés (peu importe l'expéditeur)
         # Mots-clés dans le sujet
         subject_keywords = self.config['filters'].get('subject_keywords', [])
@@ -247,7 +222,7 @@ class EmailMonitor:
             if keyword.lower() in subject.lower():
                 logger.info(f"✅ Email accepté car mot-clé '{keyword}' trouvé dans le sujet")
                 return True
-
+        
         # Mots-clés dans le contenu du corps
         body_keywords = self.config['filters'].get('keywords', [])
         logger.info(f"Vérification mots-clés corps: {body_keywords}")
@@ -264,7 +239,7 @@ class EmailMonitor:
             if allowed_sender.lower() in sender.lower():
                 logger.info(f"✅ Email accepté car expéditeur autorisé: {sender}")
                 return True
-
+        
         logger.info("❌ Email rejeté - aucun critère de filtre ne correspond")
         return False
     
@@ -371,6 +346,20 @@ class EmailMonitor:
             
         except Exception as e:
             logger.error(f"Erreur lors de la vérification des emails: {e}")
+            
+            error_message = str(e).lower()
+            if "eof occurred in violation of protocol" in error_message:
+                title = "🚨 Erreur Critique Email Monitor"
+                body = "La connexion IMAP a été coupée (possible blocage IP). Le service va tenter de se reconnecter. Pensez à augmenter l'intervalle de vérification si l'erreur persiste."
+                self.send_ntfy_error_notification(title, body)
+                # Forcer une reconnexion à la prochaine itération
+                if self.imap:
+                    try:
+                        self.imap.logout()
+                    except:
+                        pass # Ignore errors on logout
+                self.imap = None
+
             return []
     
     def send_desktop_notification(self, email_info: Dict):
@@ -697,75 +686,38 @@ class EmailMonitor:
             threading.Thread(target=self.play_intensive_alarm, args=(email_info,)).start()
     
     def start_monitoring(self):
-        """Démarre la surveillance des emails avec reconnexion automatique"""
+        """Démarre la surveillance des emails"""
+        if not self.connect_to_imap():
+            return
+        
         self.running = True
         check_interval = self.config['monitoring']['check_interval']
-        connection_retries = 0
-        max_connection_retries = 5
         
         logger.info(f"Surveillance démarrée (vérification toutes les {check_interval}s)")
         
-        while self.running and connection_retries < max_connection_retries:
-            try:
-                # Vérifier/établir la connexion
-                if not self.imap or connection_retries > 0:
+        try:
+            while self.running:
+                if not self.imap or self.imap.state == 'LOGOUT':
+                    logger.info("Connexion IMAP perdue ou inexistante, tentative de reconnexion...")
                     if not self.connect_to_imap():
-                        connection_retries += 1
-                        logger.error(f"Échec de connexion {connection_retries}/{max_connection_retries}")
-                        if connection_retries < max_connection_retries:
-                            logger.info(f"Nouvelle tentative dans 60 secondes...")
-                            time.sleep(60)
-                            continue
-                        else:
-                            logger.error("Abandon après trop d'échecs de connexion")
-                            break
-                    else:
-                        connection_retries = 0  # Reset counter on successful connection
+                        logger.warning("Reconnexion échouée, nouvel essai dans 60 secondes.")
+                        time.sleep(60) # Attendre avant de retenter pour ne pas spammer
+                        continue
+
+                new_emails = self.check_new_emails()
                 
-                # Boucle principale de surveillance
-                consecutive_errors = 0
-                while self.running:
-                    try:
-                        new_emails = self.check_new_emails()
-                        consecutive_errors = 0  # Reset error counter on success
-                        
-                        for email_info in new_emails:
-                            logger.info(f"Email correspondant détecté: {email_info['subject']}")
-                            self.send_notifications(email_info)
-                        
-                        time.sleep(check_interval)
-                        
-                    except Exception as e:
-                        consecutive_errors += 1
-                        error_msg = str(e).lower()
-                        
-                        # Erreurs de connexion - tenter de se reconnecter
-                        if any(keyword in error_msg for keyword in ['eof', 'protocol', 'connection', 'timeout', 'socket']):
-                            logger.warning(f"Erreur de connexion détectée ({consecutive_errors}/3): {e}")
-                            if consecutive_errors >= 3:
-                                logger.warning("Trop d'erreurs consécutives, tentative de reconnexion...")
-                                break  # Sortir de la boucle interne pour se reconnecter
-                            else:
-                                logger.info(f"Attente de {check_interval * 2}s avant nouvelle tentative...")
-                                time.sleep(check_interval * 2)
-                        else:
-                            # Autres erreurs
-                            logger.error(f"Erreur dans la surveillance: {e}")
-                            time.sleep(check_interval)
-                            
-            except KeyboardInterrupt:
-                logger.info("Arrêt demandé par l'utilisateur")
-                break
-            except Exception as e:
-                logger.error(f"Erreur fatale dans la surveillance: {e}")
-                connection_retries += 1
-                if connection_retries < max_connection_retries:
-                    logger.info("Tentative de redémarrage...")
-                    time.sleep(30)
-                else:
-                    break
-        
-        self.stop_monitoring()
+                for email_info in new_emails:
+                    logger.info(f"Email correspondant détecté: {email_info['subject']}")
+                    self.send_notifications(email_info)
+                
+                time.sleep(check_interval)
+                
+        except KeyboardInterrupt:
+            logger.info("Arrêt demandé par l'utilisateur")
+        except Exception as e:
+            logger.error(f"Erreur dans la boucle de surveillance: {e}")
+        finally:
+            self.stop_monitoring()
     
     def stop_monitoring(self):
         """Arrête la surveillance"""
@@ -777,6 +729,42 @@ class EmailMonitor:
                 logger.info("Connexion IMAP fermée")
             except:
                 pass
+
+    def send_ntfy_error_notification(self, title: str, message: str):
+        """Envoie une notification d'erreur générique via ntfy.sh avec un cooldown."""
+        try:
+            # --- COOLDOWN LOGIC ---
+            now = datetime.now()
+            if self.last_error_notification_time:
+                # 30 minutes = 1800 secondes
+                if (now - self.last_error_notification_time).total_seconds() < 1800:
+                    logger.info(f"Notification d'erreur '{title}' ignorée (cooldown de 30 min actif)")
+                    return
+            # --- END COOLDOWN LOGIC ---
+
+            ntfy_config = self.config['notifications']['ntfy']
+            if not ntfy_config.get('enabled'):
+                logger.warning("Notification d'erreur ignorée (NTFY désactivé)")
+                return
+
+            data = {
+                'title': title,
+                'message': message,
+                'priority': 4,  # High
+                'tags': ['rotating_light', 'error']
+            }
+            
+            response = requests.post(ntfy_config['url'], json=data, timeout=10)
+            
+            if response.status_code == 200:
+                logger.info("Notification d'erreur ntfy envoyée avec succès")
+                # Mettre à jour le timestamp seulement si l'envoi réussit
+                self.last_error_notification_time = now
+            else:
+                logger.error(f"Erreur notification d'erreur ntfy: {response.status_code}, {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Impossible d'envoyer la notification d'erreur ntfy: {e}")
 
 def main():
     """Fonction principale"""
